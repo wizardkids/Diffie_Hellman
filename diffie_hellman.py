@@ -9,13 +9,12 @@
 
 Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key to decryption.  The generate_DH() function generates keys for BOTH the sender and the recipient. Both parties then have the key to encrypt/decrypt the text, since encryption uses the key that both parties have.
 
-This introduces a potential confusion, since in real life, the sender would generate a public and private set of keys, and pass the public key to the recipient. The recipient would do the same. Now each party has the other party's public key and, with their own secret number, both party's can generate a shared key to use for encryption and decryption.
+This introduces a potential confusion, since in real life, the sender would generate a public and private set of keys, and pass the public key to the recipient. The recipient would do the same, passing their key to the sender. Now each party has the other party's public key and, with their own secret number, both party's can generate a shared key to use for encryption and decryption.
 
-This program generate public and private keys for both the sender and the recipient at the same time when, in reality, these would be separate steps since private keys necessarily need to be kept, well... private. Here, the private keys are essentially bundled with the public keys. Keys are saved in files, but to maintain a little clarity sender's and recipient's keys are saved in separate files.
+This program generate public and private keys for both the sender and the recipient at the same time when, in reality, these would be separate steps since private keys necessarily need to be kept, well... private. Here, the private keys are essentially bundled with the public keys. Keys are saved in files, but to maintain a modicum of clarity, sender's and recipient's keys are saved in separate files.
 """
 
 import json
-import sys
 from pathlib import Path
 from random import randint
 from typing import TypeVar
