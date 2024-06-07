@@ -29,12 +29,12 @@ from icecream import ic
 
 T = TypeVar("T")
 
-# Get the absolute path of the parent directory.
-parent_dir: Path = Path(__file__).resolve().parent.parent
+# # Get the absolute path of the parent directory.
+# parent_dir: Path = Path(__file__).resolve().parent.parent
 
-# Add the parent directory to sys.path so we can access rsa_encryption.py
-sys.path.append(str(parent_dir))
-from RSA import rsa_encryption as rsa
+# # Add the parent directory to sys.path so we can access rsa_encryption.py
+# sys.path.append(str(parent_dir))
+# from RSA import rsa_encryption as rsa
 
 VERSION = "0.1"
 
@@ -44,7 +44,16 @@ VERSION = "0.1"
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
 @click.option("-p", "--printkeys", is_flag=True, default=False, help="Print sender and recipient keys.")
 @click.version_option(version=VERSION)
-def cli(message, file, printkeys) -> None:
+def cli(message: str, file: str, printkeys: bool) -> None:
+    """
+    Entry point for this CLI.
+
+    Parameters
+    ----------
+    message : str -- text message to encrypt
+    file : click.Path -- file containing text to encrypt
+    printkeys : bool -- utility function to print encryption keys
+    """
 
     # print()
     # ic(message)
@@ -52,14 +61,22 @@ def cli(message, file, printkeys) -> None:
     # ic(printkeys)
     # print()
 
+    # Trying to encrypt a [MESSAGE] and file contents at the same time is not permitted.
     if message is not None and file is not None:
         print('Providing both a text message and a filename is not allowed.')
         exit()
+    else:
+        main(message, file, printkeys)
 
-    main(message, file, printkeys)
 
+def encrypt(message: str) -> None:
+    """
+    Encrypt the text of message using AES encryption and the senders' key.
 
-def encrypt(message: str):
+    Parameters
+    ----------
+    message : str -- message to encrypt
+    """
 
     # To encrypt, keys will have already been generated and stored in sender_key_file.json and recipient_key_file.json
     with open("sender_key_file.json", 'r') as file:
@@ -82,8 +99,6 @@ def encrypt(message: str):
 
     cipher = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher.encrypt_and_digest(data)
-    # nonce: bytes = cipher.nonce
-    # iv = cipher.iv
     iv: bytes = cipher.nonce
 
     # Bundle the encrypted and hexified data with the salt, iterations, and nonce
@@ -100,7 +115,11 @@ def encrypt(message: str):
     return
 
 
-def decrypt():
+def decrypt() -> None:
+    """
+    Decrypt the encrypted message saved in "encrypted.json". Decryption requires the public key from the sender and the recipient's private key (secret number).
+    """
+
     # Retrieve information from "encrypted.json".
     with open('encrypted.json', 'rb') as file:
         info = json.load(file)
@@ -185,81 +204,6 @@ def generate_DH() -> None:
         json.dump(recipient_keys, f)
 
 
-def generate_keys_old() -> tuple[bytes, dict]:
-    """
-    Generate key for both ends of an encrypted communication.
-
-    Returns
-    -------
-
-    """
-
-    # b should be a primitive root, but I will wait to implement that.
-    b: int = randint(3, 10)
-
-    while True:
-        m: int = randint(10, 99)
-        if is_prime(m):
-            break
-
-    # Create a private key for each end of the communication. The keys can't be the same.
-    private_key_A: int = randint(10, 99)
-    private_key_B: int = randint(10, 99)
-    while private_key_A == private_key_B:
-        private_key_B: int = randint(10, 99)
-
-    # Create public keys for each end of the communication.
-    public_key_A: int = (b**private_key_A) % m
-    public_key_B: int = (b**private_key_B) % m
-
-    # Calculate the shared secret number. _A and _B should be the same,
-    # so with the following code, I can check that they are.
-    shared_secret_A: int = (public_key_A**private_key_B) % m
-    shared_secret_B: int = (public_key_B**private_key_A) % m
-    if shared_secret_A != shared_secret_B:
-        print("Something went wrong. The shared secrets in generate_keys() are not the same.")
-        exit()
-    shared_secret_int: int = shared_secret_A
-
-    # Convert the "shared_secret_int" integer to bytes.
-    # 16 is the length of the bytes object, 'big' is the byte order
-    shared_secret: bytes = shared_secret_int.to_bytes(16, 'big')
-
-    # Generate a random salt in bytes. This is a very big number!
-    salt: bytes = get_random_bytes(16)
-
-    # Number of iterations.
-    iterations: int = 100_000
-
-    # Desired key length.
-    key_length: int = 32
-
-    # Derive the key. Since "key" is based on the same "salt" and "shared_secret", it will be the same as long as both parties have the salt and the "shared_secret".
-    # This requires sending "salt" and "iterations" along with then encrypted data.
-    key: bytes = PBKDF2(shared_secret, salt, dkLen=key_length, count=iterations, hmac_hash_module=SHA256)
-
-    encrypted_bundle: dict[str, any] = {
-        'ciphertext': "",
-        'salt': salt,
-        'iterations': iterations,
-        'nonce': ""
-    }
-
-    # ic(b)
-    # ic(m)
-    # ic(public_key_A)
-    # ic(public_key_B)
-    # ic(private_key_A)
-    # ic(private_key_B)
-    # ic(shared_secret_A)
-    # ic(shared_secret_B)
-    # ic(shared_secret)
-    # ic(salt)
-    # print(key)
-
-    return shared_secret, encrypted_bundle
-
-
 def is_prime(n: int) -> bool:
     """
     Returns True if "n" is a prime number. A prime number is a positive integer greater than 1 that has no positive integer divisors other than 1 and itself.
@@ -284,7 +228,11 @@ def is_prime(n: int) -> bool:
     return True
 
 
-def print_keys():
+def print_keys() -> None:
+    """
+    Print the sender's and recipient's keys.
+    """
+
     with open("sender_key_file.json", 'r') as file:
         sender_keys = json.load(file)
     with open("recipient_key_file.json", 'r') as file:
@@ -293,12 +241,24 @@ def print_keys():
     for k, v in sender_keys.items():
         print(f'{k}: {v}')
     print()
+
     for k, v in recipient_keys.items():
         print(f'{k}: {v}')
+
     return
 
 
-def main(message: str, file: str, printkeys: bool) -> None:
+def main(plaintext: str, file: str, printkeys: bool) -> None:
+    """
+    Main organizing function for the CLI.
+
+    Parameters
+    ----------
+    plaintext : str -- message to encrypt
+    file : str -- file containing text to encrypt
+    printkeys : bool -- if True, print the sender's and recipient's keys and exit
+
+    """
 
     if printkeys:
         print_keys()
@@ -316,6 +276,8 @@ def main(message: str, file: str, printkeys: bool) -> None:
         else:
             print(f'Could not find file "{file}"')
             exit()
+    else:
+        message = plaintext
 
     # If there's a message, then encrypt it. If there are no arguments, decrypt the "ciphertext" in encrypted.json
     if message:
