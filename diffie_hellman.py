@@ -72,14 +72,14 @@ def encrypt(message: str) -> None:
     message : str -- message to encrypt
     """
 
-    # To encrypt, keys will have already been generated and stored in sender_key_file.json and recipient_key_file.json
-    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
+    # To encrypt, keys will have already been generated and stored in sender.json and recipient.json
+    with open("sender.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
+    with open("recipient.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
-    # Using information in the key_file.json, calculate the "shared_secret" value.
-    shared_key: int = (recipient_keys['public_number_B']**sender_keys['secret_number_A']) % sender_keys['m']
+    # Using the recipient's publick key and the sender's private key, calculate the "shared_secret" value.
+    shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
 
     # Convert "message" from a str to a byte string.
     data: bytes = message.encode(encoding='utf-8')
@@ -122,12 +122,12 @@ def decrypt() -> None:
     iv: bytes = bytes.fromhex(info['iv'])
 
     # Retrieve the sender's and recipient's key information.
-    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
+    with open("sender.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
+    with open("recipient.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
-    shared_key = (sender_keys['public_number_A']**recipient_keys['secret_number_B']) % recipient_keys['m']
+    shared_key = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['m']
 
     # Derive the key using the provided salt and iterations
     key: bytes = PBKDF2(shared_key, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
@@ -171,9 +171,9 @@ def generate_DH() -> None:
 
     # Bob and Alice must agree on "b" and "m". Bob already decided on "b" and "m". Because they are essentially public, Alice retrieves those values and uses them.
     if party == "r":
-        sender_keys = get_sender_info()
-        b = sender_keys['b']
-        m = sender_keys['m']
+        sender_keys: dict[str, int] = get_sender_info()
+        b: int = sender_keys['b']
+        m: int = sender_keys['m']
     else:
         b: int = 2
         while True:
@@ -215,7 +215,7 @@ def generate_DH() -> None:
     #     json.dump(recipient_keys, f)
 
 
-def get_sender_info():
+def get_sender_info() -> dict[str, int]:
     with open("sender.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
     return sender_keys
@@ -276,6 +276,13 @@ def main(plaintext: str, generate: bool, file: str, printkeys: bool) -> None:
 
     """
 
+    print()
+    ic(plaintext)
+    ic(generate)
+    ic(file)
+    ic(printkeys)
+    print()
+
     if printkeys:
         print_keys()
         exit()
@@ -299,7 +306,7 @@ def main(plaintext: str, generate: bool, file: str, printkeys: bool) -> None:
     # If there's a message, then encrypt it. If there are no arguments, decrypt the "ciphertext" in encrypted.json
     if message:
         # First, generate keys for both sender and recipient, so we have the keys to encrypt with.
-        generate_DH()
+        # generate_DH()
         encrypt(message)
     else:
         # The keys for decryption are store in sender and recipient key files.
