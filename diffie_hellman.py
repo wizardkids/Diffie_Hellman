@@ -60,7 +60,7 @@ def cli(message: str, generate: bool, file: str, printkeys: bool) -> None:
         print('Providing both a text message and a filename is not allowed.')
         exit()
     else:
-        main(message, file, printkeys)
+        main(message, generate, file, printkeys)
 
 
 def encrypt(message: str) -> None:
@@ -165,25 +165,32 @@ def generate_DH() -> None:
         Range: "secret_number" should be in the range ( [1, m-2] ). It’s important that "secret_number" is not too small, as small values can weaken the security of the key exchange.
     """
 
-    # Bob and Alice agree on "b" and "m", which at this point are selected randomly. These values are not secret, but both parties must know what they are.
-    # b: int = randint(3, 10) # b should be a primitive root, but I will wait to implement that.
-    b: int = 2
+    party = ""
+    while party not in ['s', 'r']:
+        party: str = input("Keys are for [s]ender or [r]ecipient: ").lower()
 
-    while True:
-        m: int = randint(10, 256)
-        # m: int = randint(10, 256)
-        if is_prime(m):
-            break
+    # Bob and Alice must agree on "b" and "m". Bob already decided on "b" and "m". Because they are essentially public, Alice retrieves those values and uses them.
+    if party == "r":
+        sender_keys = get_sender_info()
+        b = sender_keys['b']
+        m = sender_keys['m']
+    else:
+        b: int = 2
+        while True:
+            m: int = randint(10, 256)
+            # m: int = randint(10, 256)
+            if is_prime(m):
+                break
 
     # Bob and Alice each select a unique number that is a secret. The numbers shouldn't be the same.
-    secret_number_A: int = randint(1000, 1000)
-    secret_number_B: int = randint(1000, 10000)
-    while secret_number_A == secret_number_B:
-        secret_number_B: int = randint(1000, 10000)
+    secret_number: int = randint(1000, 10000)
+    # secret_number_B: int = randint(1000, 10000)
+    # while secret_number_A == secret_number_B:
+    #     secret_number_B: int = randint(1000, 10000)
 
     # modular function to create numbers that Bob and Alice need to exchange with each other.
-    public_number_A: int = (b**secret_number_A) % m
-    public_number_B: int = (b**secret_number_B) % m
+    public_number: int = (b**secret_number) % m
+    # public_number_B: int = (b**secret_number_B) % m
 
     """
     Each party can compute a shared number, based only on the public number of the OTHER party and THEIR OWN secret number. This way, computation of the valuable shared number only requires sharing a publically available number.
@@ -192,16 +199,26 @@ def generate_DH() -> None:
     shared_key_B: int = (public_number_A**secret_number_B) % m  # 7^6 mod 13 = 12
     """
 
-    sender_keys: dict[str, int] = {"m": m, "secret_number_A": secret_number_A, "public_number_A": public_number_A}
+    keys: dict[str, int] = {"b": b, "m": m, "secret_number": secret_number, "public_number": public_number}
 
-    recipient_keys: dict[str, int] = {"m": m, "secret_number_B": secret_number_B, "public_number_B": public_number_B}
+    # recipient_keys: dict[str, int] = {"m": m, "secret_number_B": secret_number_B, "public_number_B": public_number_B}
 
-    with open("sender_key_file.json", 'w', encoding="utf-8") as f:
-        json.dump(sender_keys, f)
+    filename: str = 'sender.json' if party =='s' else 'recipient.json'
 
-    with open("recipient_key_file.json", 'w', encoding="utf-8") as f:
-        json.dump(recipient_keys, f)
+    with open(filename, 'w', encoding="utf-8") as f:
+        json.dump(keys, f)
 
+    print(f'Keys for {filename[:-5]} saved in "{filename}".')
+    pass
+
+    # with open("recipient_key_file.json", 'w', encoding="utf-8") as f:
+    #     json.dump(recipient_keys, f)
+
+
+def get_sender_info():
+    with open("sender.json", 'r', encoding='utf-8') as file:
+        sender_keys = json.load(file)
+    return sender_keys
 
 def is_prime(n: int) -> bool:
     """
@@ -247,7 +264,7 @@ def print_keys() -> None:
     return
 
 
-def main(plaintext: str, file: str, printkeys: bool) -> None:
+def main(plaintext: str, generate: bool, file: str, printkeys: bool) -> None:
     """
     Main organizing function for the CLI.
 
@@ -261,6 +278,10 @@ def main(plaintext: str, file: str, printkeys: bool) -> None:
 
     if printkeys:
         print_keys()
+        exit()
+
+    if generate:
+        generate_DH()
         exit()
 
     # If there's a file name on the command line, put its contents into "message".
