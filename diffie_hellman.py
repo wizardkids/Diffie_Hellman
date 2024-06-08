@@ -148,10 +148,10 @@ def generate_DH() -> None:
 
     Each party can calculate a "shared_key" by using THEIR "secret_number" and the OTHER party's "public_number".
 
-    "b", "m", "secret_number_A", "secret_number_B", "public_number_A", "public_number_B" are all values required to calculate a "shared_key"
+    "b", "m", "secret_number", "public_number", are all values required to calculate a "shared_key". Both the sender and the recipient, with the correct information from the other party, will calculate the same shared key. Because this calculation depends on the "secret_number" that only one party knows, only the sender and recipient can calculate this shared number. That is the magic of Duffie-Hellman key exchange.
 
     CODENOTE
-    Because adhering to the following results in very long computation times, I have chosen to deviate. But following are the guidelines for selecting "b", "m", and the "secret number".
+    Because adhering to the following guidelines results in very long computation times, I have chosen to deviate. But these guidelines are recommended selecting secure values for "b", "m", and the "secret number".
     "b":
         The base, it's often chosen to be a small prime number or a primitive root modulo "m". While "b" doesn't need to be as large as "m", it should be chosen to ensure the security properties of the Diffie-Hellman exchange are maintained. In many cases, "b" is simply set to 2 or another small number.
 
