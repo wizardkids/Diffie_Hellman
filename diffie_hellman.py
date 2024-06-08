@@ -7,11 +7,9 @@
      (i) DH key exchange
     (ii) AES encryption
 
-Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key to decryption.  The generate_DH() function generates keys for BOTH the sender and the recipient. Both parties then have the key to encrypt/decrypt the text, since encryption uses the key that both parties have.
+Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for either the sender or the recipient (but both must have keys!). Both parties have the keys to encrypt/decrypt text.
 
-This introduces a potential confusion, since in real life, the sender would generate a public and private set of keys, and pass the public key to the recipient. The recipient would do the same, passing their key to the sender. Now each party has the other party's public key and, with their own secret number, both party's can generate a shared key to use for encryption and decryption.
-
-Public keys are stored in "sender_key_file.json" and "recipient_key_file.json", along with each party's "secret" or private number. These data can be used to generate the shared key that is required to encrypt and decrypt text. Public keys are meant to be public or, at least, not secure. Obviously, storing the sender's and recipient's secret number alongside the public keys is the epitome of insecurity. But that is the only way this program can work!
+The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. The private key needed for encryption is read from the sender's .json file. From these data, a shared key is created and used for encryption. Decryption requires reading the sender's public key and the recipient's private key. The recipient then creates the same shared key that was used by the sender to encrypt the text.
 """
 
 import json
@@ -31,7 +29,7 @@ T = TypeVar("T")
 VERSION = "0.1"
 
 
-@click.command(help="Encrypt/decrypt [MESSAGE] or [PATH] using AES encryption and prepare Diffie-Hellman keys for sender and recipient for secure transmission of encrypted text.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> sender encrypts the text using the shared key\n\ndiffie_hellman.py --> \"encrypted.json\" is decrypted by the recipient using the shared key\n\nPublic keys are stored in \"sender_key_file.json\" and \"recipient_key_file.json\" along with each party's \"secret\" or private number. These data are used to generate the shared key that is required to encrypt and decrypt text.")
+@click.command(help="Step 1: Generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] using AES encryption and sender's private key and recipient's public key.\n\nStep 3: Decrypt [MESSAGE] or [PATH] using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Data in these files are used to generate the shared key that is required to encrypt and decrypt text.")
 @click.argument("message", type=str, required=False)
 @click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys.')
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
@@ -44,16 +42,17 @@ def cli(message: str, generate: bool, file: str, printkeys: bool) -> None:
     Parameters
     ----------
     message : str -- text message to encrypt
+    generate : bool -- if True, generate Diffie-Hellman keys
     file : click.Path -- file containing text to encrypt
-    printkeys : bool -- utility function to print encryption keys
+    printkeys : bool -- if True, print encryption keys
     """
 
-    print()
-    ic(message)
-    ic(generate)
-    ic(file)
-    ic(printkeys)
-    print()
+    # print()
+    # ic(message)
+    # ic(generate)
+    # ic(file)
+    # ic(printkeys)
+    # print()
 
     # Trying to encrypt a [MESSAGE] and file contents at the same time is not permitted.
     if message is not None and file is not None:
@@ -184,24 +183,11 @@ def generate_DH() -> None:
 
     # Bob and Alice each select a unique number that is a secret. The numbers shouldn't be the same.
     secret_number: int = randint(1000, 10000)
-    # secret_number_B: int = randint(1000, 10000)
-    # while secret_number_A == secret_number_B:
-    #     secret_number_B: int = randint(1000, 10000)
 
     # modular function to create numbers that Bob and Alice need to exchange with each other.
     public_number: int = (b**secret_number) % m
-    # public_number_B: int = (b**secret_number_B) % m
-
-    """
-    Each party can compute a shared number, based only on the public number of the OTHER party and THEIR OWN secret number. This way, computation of the valuable shared number only requires sharing a publically available number.
-
-    shared_key_A: int = (public_number_B**secret_number_A) % m  # 12^5 mod 13 = 12
-    shared_key_B: int = (public_number_A**secret_number_B) % m  # 7^6 mod 13 = 12
-    """
 
     keys: dict[str, int] = {"b": b, "m": m, "secret_number": secret_number, "public_number": public_number}
-
-    # recipient_keys: dict[str, int] = {"m": m, "secret_number_B": secret_number_B, "public_number_B": public_number_B}
 
     filename: str = 'sender.json' if party =='s' else 'recipient.json'
 
@@ -209,10 +195,6 @@ def generate_DH() -> None:
         json.dump(keys, f)
 
     print(f'Keys for {filename[:-5]} saved in "{filename}".')
-    pass
-
-    # with open("recipient_key_file.json", 'w', encoding="utf-8") as f:
-    #     json.dump(recipient_keys, f)
 
 
 def get_sender_info() -> dict[str, int]:
@@ -276,13 +258,6 @@ def main(plaintext: str, generate: bool, file: str, printkeys: bool) -> None:
 
     """
 
-    print()
-    ic(plaintext)
-    ic(generate)
-    ic(file)
-    ic(printkeys)
-    print()
-
     if printkeys:
         print_keys()
         exit()
@@ -306,7 +281,6 @@ def main(plaintext: str, generate: bool, file: str, printkeys: bool) -> None:
     # If there's a message, then encrypt it. If there are no arguments, decrypt the "ciphertext" in encrypted.json
     if message:
         # First, generate keys for both sender and recipient, so we have the keys to encrypt with.
-        # generate_DH()
         encrypt(message)
     else:
         # The keys for decryption are store in sender and recipient key files.
