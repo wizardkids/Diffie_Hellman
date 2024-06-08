@@ -24,7 +24,6 @@ from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
 from icecream import ic
 
-
 VERSION = "0.1"
 
 
@@ -71,10 +70,15 @@ def encrypt(message: str) -> None:
     """
 
     # To encrypt, keys will have already been generated and stored in sender.json and recipient.json
-    with open("sender.json", 'r', encoding='utf-8') as file:
-        sender_keys = json.load(file)
-    with open("recipient.json", 'r', encoding='utf-8') as file:
-        recipient_keys = json.load(file)
+    try:
+        with open("sender.json", 'r', encoding='utf-8') as file:
+            sender_keys = json.load(file)
+        with open("recipient.json", 'r', encoding='utf-8') as file:
+            recipient_keys = json.load(file)
+    except FileNotFoundError as e:
+        print(e)
+        print("Use --generate option first to create sender\nand recipient keys.")
+        exit()
 
     # Using the recipient's publick key and the sender's private key, calculate the "shared_secret" value.
     shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
@@ -104,15 +108,19 @@ def encrypt(message: str) -> None:
     with open('encrypted.json', 'w', encoding='utf-8') as f:
         json.dump(encrypted_bundle, f)
 
-
 def decrypt() -> None:
     """
     Decrypt the encrypted message saved in "encrypted.json". Decryption requires the public key from the sender and the recipient's private key (secret number).
     """
 
     # Retrieve information from "encrypted.json".
-    with open('encrypted.json', 'rb') as file:
-        info = json.load(file)
+    try:
+        with open('encrypted.json', 'rb') as file:
+            info = json.load(file)
+    except FileNotFoundError as e:
+        print(e)
+        print("Provide text to encrypt first.")
+        exit()
 
     ciphertext: bytes = bytes.fromhex(info['ciphertext'])
     salt: bytes = bytes.fromhex(info['salt'])
@@ -120,10 +128,15 @@ def decrypt() -> None:
     iv: bytes = bytes.fromhex(info['iv'])
 
     # Retrieve the sender's and recipient's key information.
-    with open("sender.json", 'r', encoding='utf-8') as file:
-        sender_keys = json.load(file)
-    with open("recipient.json", 'r', encoding='utf-8') as file:
-        recipient_keys = json.load(file)
+    try:
+        with open("sender.json", 'r', encoding='utf-8') as file:
+            sender_keys = json.load(file)
+        with open("recipient.json", 'r', encoding='utf-8') as file:
+            recipient_keys = json.load(file)
+    except FileNotFoundError as e:
+        print(e)
+        print("Use --generate option first to create sender\nand recipient keys.")
+        exit()
 
     shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['m']
 
@@ -236,9 +249,14 @@ def get_sender_info() -> dict[str, int]:
     -------
     dict[str, int] -- sender's keys
     """
-    with open("sender.json", 'r', encoding='utf-8') as file:
-        sender_keys = json.load(file)
-    return sender_keys
+    try:
+        with open("sender.json", 'r', encoding='utf-8') as file:
+            sender_keys = json.load(file)
+        return sender_keys
+    except FileNotFoundError as e:
+        print(e)
+        print("Use --generate option first to create sender\nand recipient keys.")
+        exit()
 
 
 def is_prime(n: int) -> bool:
@@ -270,10 +288,15 @@ def print_keys() -> None:
     Print the sender's and recipient's keys.
     """
 
-    with open("sender.json", 'r', encoding='utf-8') as file:
-        sender_keys = json.load(file)
-    with open("recipient.json", 'r', encoding='utf-8') as file:
-        recipient_keys = json.load(file)
+    try:
+        with open("sender.json", 'r', encoding='utf-8') as file:
+            sender_keys = json.load(file)
+        with open("recipient.json", 'r', encoding='utf-8') as file:
+            recipient_keys = json.load(file)
+    except FileNotFoundError as e:
+        print(e)
+        print("Use --generate option first to create sender\nand recipient keys.")
+        exit()
 
     print('SENDER KEYS:')
     for k, v in sender_keys.items():
