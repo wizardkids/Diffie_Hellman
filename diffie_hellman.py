@@ -33,10 +33,11 @@ VERSION = "0.1"
 
 @click.command(help="Encrypt/decrypt [MESSAGE] or [PATH] using AES encryption and prepare Diffie-Hellman keys for sender and recipient for secure transmission of encrypted text.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> sender encrypts the text using the shared key\n\ndiffie_hellman.py --> \"encrypted.json\" is decrypted by the recipient using the shared key\n\nPublic keys are stored in \"sender_key_file.json\" and \"recipient_key_file.json\" along with each party's \"secret\" or private number. These data are used to generate the shared key that is required to encrypt and decrypt text.")
 @click.argument("message", type=str, required=False)
+@click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys.')
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
 @click.option("-p", "--printkeys", is_flag=True, default=False, help="Print sender and recipient keys.")
 @click.version_option(version=VERSION)
-def cli(message: str, file: str, printkeys: bool) -> None:
+def cli(message: str, generate: bool, file: str, printkeys: bool) -> None:
     """
     Entry point for this CLI.
 
@@ -47,11 +48,12 @@ def cli(message: str, file: str, printkeys: bool) -> None:
     printkeys : bool -- utility function to print encryption keys
     """
 
-    # print()
-    # ic(message)
-    # ic(file)
-    # ic(printkeys)
-    # print()
+    print()
+    ic(message)
+    ic(generate)
+    ic(file)
+    ic(printkeys)
+    print()
 
     # Trying to encrypt a [MESSAGE] and file contents at the same time is not permitted.
     if message is not None and file is not None:
