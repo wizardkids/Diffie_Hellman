@@ -15,6 +15,7 @@ The "passing" of public keys is done during encryption by reading the public key
 import json
 from pathlib import Path
 from random import randint
+from time import sleep
 from typing import TypeVar
 
 import click
@@ -168,6 +169,12 @@ def generate_DH() -> None:
     while party not in ['s', 'r']:
         party: str = input("Keys are for [s]ender or [r]ecipient: ").lower()
 
+    if party == 's':
+        print("Generating common base (b) and modulus (m)...")
+    else:
+        print("Retrieving common base (b) and modulus (m) from sender...")
+    sleep(2.5)
+
     # Bob and Alice must agree on "b" and "m". Bob already decided on "b" and "m". Because they are essentially public, Alice retrieves those values and uses them.
     if party == "r":
         sender_keys: dict[str, int] = get_sender_info()
@@ -181,20 +188,41 @@ def generate_DH() -> None:
             if is_prime(m):
                 break
 
+    if party == "s":
+        print("Selecting secret number (private key) for sender...")
+    else:
+        print("Selecting secret number (private key) for recipient...")
+    sleep(2.5)
+
     # Bob and Alice each select a unique number that is a secret. The numbers shouldn't be the same.
     secret_number: int = randint(1000, 10000)
+
+    print("Using modular function (b**secret_number % m) to generate public key")
+    if party == "s":
+        print("for sender...", end='')
+    else:
+        print("for recipient", end='')
+    print("")
+    sleep(3.5)
 
     # modular function to create numbers that Bob and Alice need to exchange with each other.
     public_number: int = (b**secret_number) % m
 
     keys: dict[str, int] = {"b": b, "m": m, "public_number": public_number, "secret_number": secret_number}
 
+    print("\nKeys for this session:")
+    for k, v in keys.items():
+        print(f"{k}: {v}")
+    sleep(0.8)
+
     filename: str = 'sender.json' if party == 's' else 'recipient.json'
 
     with open(filename, 'w', encoding="utf-8") as f:
         json.dump(keys, f)
 
-    print(f'Keys for {filename[:-5]} saved in "{filename}".')
+    print(f'\nKeys for {filename[:-5]} saved in "{filename}".', sep='')
+
+
 
 
 def get_sender_info() -> dict[str, int]:
