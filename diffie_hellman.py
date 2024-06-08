@@ -126,7 +126,7 @@ def decrypt() -> None:
     with open("recipient.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
-    shared_key = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['m']
+    shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['m']
 
     # Derive the key using the provided salt and iterations
     key: bytes = PBKDF2(shared_key, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
