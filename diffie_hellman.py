@@ -11,7 +11,7 @@ Unlike other encryption programs that I have written, this one includes a mechan
 
 This introduces a potential confusion, since in real life, the sender would generate a public and private set of keys, and pass the public key to the recipient. The recipient would do the same, passing their key to the sender. Now each party has the other party's public key and, with their own secret number, both party's can generate a shared key to use for encryption and decryption.
 
-This program generate public and private keys for both the sender and the recipient at the same time when, in reality, these would be separate steps since private keys necessarily need to be kept, well... private. Here, the private keys are essentially bundled with the public keys. Keys are saved in files, but to maintain a modicum of clarity, sender's and recipient's keys are saved in separate files.
+Public keys are stored in "sender_key_file.json" and "recipient_key_file.json", along with each party's "secret" or private number. These data can be used to generate the shared key that is required to encrypt and decrypt text. Public keys are meant to be public or, at least, not secure. Obviously, storing the sender's and recipient's secret number alongside the public keys is the epitome of insecurity. But that is the only way this program can work!
 """
 
 import json
@@ -28,17 +28,10 @@ from icecream import ic
 
 T = TypeVar("T")
 
-# # Get the absolute path of the parent directory.
-# parent_dir: Path = Path(__file__).resolve().parent.parent
-
-# # Add the parent directory to sys.path so we can access rsa_encryption.py
-# sys.path.append(str(parent_dir))
-# from RSA import rsa_encryption as rsa
-
 VERSION = "0.1"
 
 
-@click.command(help="Encrypt/decrypt [MESSAGE] or [PATH] using AES encryption and prepare Diffie-Hellman keys for sender and recipient for secure transmission of encrypted text.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> sender encrypts the text using the shared key\n\ndiffie_hellman.py --> \"encrypted.json\" is decrypted by the recipient using the shared key")
+@click.command(help="Encrypt/decrypt [MESSAGE] or [PATH] using AES encryption and prepare Diffie-Hellman keys for sender and recipient for secure transmission of encrypted text.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> sender encrypts the text using the shared key\n\ndiffie_hellman.py --> \"encrypted.json\" is decrypted by the recipient using the shared key\n\nPublic keys are stored in \"sender_key_file.json\" and \"recipient_key_file.json\" along with each party's \"secret\" or private number. These data are used to generate the shared key that is required to encrypt and decrypt text.")
 @click.argument("message", type=str, required=False)
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
 @click.option("-p", "--printkeys", is_flag=True, default=False, help="Print sender and recipient keys.")
@@ -78,9 +71,9 @@ def encrypt(message: str) -> None:
     """
 
     # To encrypt, keys will have already been generated and stored in sender_key_file.json and recipient_key_file.json
-    with open("sender_key_file.json", 'r') as file:
+    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r') as file:
+    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
     # Using information in the key_file.json, calculate the "shared_secret" value.
@@ -101,17 +94,15 @@ def encrypt(message: str) -> None:
     iv: bytes = cipher.nonce
 
     # Bundle the encrypted and hexified data with the salt, iterations, and nonce
-    encrypted_bundle = {
+    encrypted_bundle: dict[str, str | int] = {
         'ciphertext': ciphertext.hex(),
         'salt': salt.hex(),
         'iterations': iterations,
         'iv': iv.hex(),
     }
 
-    with open('encrypted.json', 'w') as f:
+    with open('encrypted.json', 'w', encoding='utf-8') as f:
         json.dump(encrypted_bundle, f)
-
-    return
 
 
 def decrypt() -> None:
@@ -129,9 +120,9 @@ def decrypt() -> None:
     iv: bytes = bytes.fromhex(info['iv'])
 
     # Retrieve the sender's and recipient's key information.
-    with open("sender_key_file.json", 'r') as file:
+    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r') as file:
+    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
     shared_key = (sender_keys['public_number_A']**recipient_keys['secret_number_B']) % recipient_keys['m']
@@ -147,7 +138,6 @@ def decrypt() -> None:
 
     print('\nDecrypted text saved in "unencrypted.txt".')
 
-    return
 
 def generate_DH() -> None:
     """
@@ -159,42 +149,50 @@ def generate_DH() -> None:
 
     "b", "m", "secret_number_A", "secret_number_B", "public_number_A", "public_number_B" are all values required to calculate a "shared_key"
 
+    CODENOTE
+    Because adhering to the following results in very long computation times, I have chosen to deviate. But following are the guidelines for selecting "b", "m", and the "secret number".
+    "b":
+        The base, it's often chosen to be a small prime number or a primitive root modulo "m". While "b" doesn't need to be as large as "m", it should be chosen to ensure the security properties of the Diffie-Hellman exchange are maintained. In many cases, "b" is simply set to 2 or another small number.
+
+    "m":
+        You need to generate a large prime number that is at least 2048 bits long for adequate security. This is not something you can do with a simple random byte generator, as the number must be prime, not just random. There are specialized algorithms and libraries designed to generate large prime numbers for cryptographic purposes. For example, OpenSSL provides functionality to generate such prime numbers1.
+
+    "secret_number":
+        Randomness: "secret_number" should be randomly generated to ensure that it cannot be guessed or predicted by an attacker.
+        Size: The size of "secret_number" should be similar to the size of "m". If "m" is 2048 bits, then "secret_number" should also be a random number that is 2048 bits long.
+        Range: "secret_number" should be in the range ( [1, m-2] ). It’s important that "secret_number" is not too small, as small values can weaken the security of the key exchange.
     """
 
     # Bob and Alice agree on "b" and "m", which at this point are selected randomly. These values are not secret, but both parties must know what they are.
-    b: int = randint(3, 10) # b should be a primitive root, but I will wait to implement that.
+    # b: int = randint(3, 10) # b should be a primitive root, but I will wait to implement that.
+    b: int = 2
 
     while True:
-        m: int = randint(10, 99)
+        m: int = randint(10, 256)
+        # m: int = randint(10, 256)
         if is_prime(m):
             break
 
     # Bob and Alice each select a unique number that is a secret. The numbers shouldn't be the same.
-    secret_number_A: int = randint(10, 99)
-    secret_number_B: int = randint(10, 99)
+    secret_number_A: int = randint(1000, 1000)
+    secret_number_B: int = randint(1000, 10000)
     while secret_number_A == secret_number_B:
-        secret_number_B: int = randint(10, 99)
-
-    # ! "b", "m", and "secret_numbers" are assigned here for testing purposes
-    b = 6
-    m = 13
-    secret_number_A = 5
-    secret_number_B = 4
+        secret_number_B: int = randint(1000, 10000)
 
     # modular function to create numbers that Bob and Alice need to exchange with each other.
     public_number_A: int = (b**secret_number_A) % m
     public_number_B: int = (b**secret_number_B) % m
 
     """
-    Each party can compute a shared number, based only on the public number of the OTHER party and THEIR OWN secret number. This way, computation of the valuable shared number only requires sharing a publically available public number.
-    """
+    Each party can compute a shared number, based only on the public number of the OTHER party and THEIR OWN secret number. This way, computation of the valuable shared number only requires sharing a publically available number.
+
     shared_key_A: int = (public_number_B**secret_number_A) % m  # 12^5 mod 13 = 12
     shared_key_B: int = (public_number_A**secret_number_B) % m  # 7^6 mod 13 = 12
+    """
 
-    sender_keys: dict[str, T] = {"m": m, "secret_number_A": secret_number_A, "public_number_A": public_number_A}
+    sender_keys: dict[str, int] = {"m": m, "secret_number_A": secret_number_A, "public_number_A": public_number_A}
 
-    recipient_keys: dict[str, T] = {"m": m, "secret_number_B": secret_number_B, "public_number_B": public_number_B}
-
+    recipient_keys: dict[str, int] = {"m": m, "secret_number_B": secret_number_B, "public_number_B": public_number_B}
 
     with open("sender_key_file.json", 'w', encoding="utf-8") as f:
         json.dump(sender_keys, f)
@@ -232,9 +230,9 @@ def print_keys() -> None:
     Print the sender's and recipient's keys.
     """
 
-    with open("sender_key_file.json", 'r') as file:
+    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r') as file:
+    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
     for k, v in sender_keys.items():
@@ -263,9 +261,6 @@ def main(plaintext: str, file: str, printkeys: bool) -> None:
         print_keys()
         exit()
 
-    # First, we need to generate keys for both the sender and the recipient.
-    generate_DH()
-
     # If there's a file name on the command line, put its contents into "message".
     if file:
         p = Path(file)
@@ -280,8 +275,11 @@ def main(plaintext: str, file: str, printkeys: bool) -> None:
 
     # If there's a message, then encrypt it. If there are no arguments, decrypt the "ciphertext" in encrypted.json
     if message:
+        # First, generate keys for both sender and recipient, so we have the keys to encrypt with.
+        generate_DH()
         encrypt(message)
     else:
+        # The keys for decryption are store in sender and recipient key files.
         decrypt()
 
 
