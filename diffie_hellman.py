@@ -7,7 +7,7 @@
      (i) DH key exchange
     (ii) AES encryption
 
-Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for either the sender or the recipient (but both must have keys!). Both parties have the keys to encrypt/decrypt text.
+Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for both the sender or the recipient. Both parties can then calculate the key to encrypt/decrypt text.
 
 The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. The private key needed for encryption is read from the sender's .json file. From these data, a shared key is created and used for encryption. Decryption requires reading the sender's public key and the recipient's private key. The recipient then creates the same shared key that was used by the sender to encrypt the text.
 """
@@ -16,7 +16,6 @@ import json
 from pathlib import Path
 from random import randint
 from time import sleep
-from typing import TypeVar
 
 import click
 from Crypto.Cipher import AES
@@ -25,14 +24,13 @@ from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
 from icecream import ic
 
-T = TypeVar("T")
 
 VERSION = "0.1"
 
 
-@click.command(help="Step 1: Generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] using AES encryption and sender's private key and recipient's public key.\n\nStep 3: Decrypt the encrypted text (in \"encrypted.json\") using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Data in these files are used to generate the shared key that is required to encrypt and decrypt text.")
+@click.command(help="This utility performs two functions:\n\n1. Generate keys to securely transmit encrypted text for decryption\n\n2. Encrypt text using AES encryption\n\nStep 1: Use --generate to generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] sender's private key, and recipient's public key.\n\nStep 3: Decrypt the encrypted text (in \"encrypted.json\") using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nText is encrypted using AES encryption and is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Sender uses their own secret number and the recipient's public key to encrypt. Recipient uses their own secret key and the sender's public key to decrypt.")
 @click.argument("message", type=str, required=False)
-@click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys for sender or recipient.')
+@click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys for sender and recipient.')
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
 @click.option("-p", "--printkeys", is_flag=True, default=False, help="Print sender and recipient keys.")
 @click.version_option(version=VERSION)
@@ -165,64 +163,69 @@ def generate_DH() -> None:
         Range: "secret_number" should be in the range ( [1, m-2] ). It’s important that "secret_number" is not too small, as small values can weaken the security of the key exchange.
     """
 
-    party = ""
-    while party not in ['s', 'r']:
-        party: str = input("Keys are for [s]ender or [r]ecipient: ").lower()
+    # Go two rounds of key construction, where the first round is for the sender and the second round is for the recipient. Since the recipient and sender need the same "b" and "m", the recipient gets those values from the sender.
+    for round in range(2):
+        party: str = "s" if round == 0 else "r"
 
-    if party == 's':
-        print("Generating common base (b) and modulus (m)...")
-    else:
-        print("Retrieving common base (b) and modulus (m) from sender...")
-    sleep(2.5)
+        if party == 's':
+            print("Generating common base (b) and modulus (m)...")
+        else:
+            print("Retrieving common base (b) and modulus (m) from sender...")
+        sleep(2.5)
 
-    # Bob and Alice must agree on "b" and "m". Bob already decided on "b" and "m". Because they are essentially public, Alice retrieves those values and uses them.
-    if party == "r":
-        sender_keys: dict[str, int] = get_sender_info()
-        b: int = sender_keys['b']
-        m: int = sender_keys['m']
-    else:
-        b: int = 2
-        while True:
-            m: int = randint(10, 256)
-            # m: int = randint(10, 256)
-            if is_prime(m):
-                break
+        # sender chooses a "b" and an "m". recipient uses the same values, which have been stored in "sender.json".
+        if party == "s":
+            b: int = 3
+            while True:
+                m: int = randint(10, 256)
+                # m: int = randint(10, 256)
+                if is_prime(m):
+                    break
+        else:
+            sender_keys: dict[str, int] = get_sender_info()
+            b: int = sender_keys['b']
+            m: int = sender_keys['m']
 
-    if party == "s":
-        print("Selecting secret number (private key) for sender...")
-    else:
-        print("Selecting secret number (private key) for recipient...")
-    sleep(2.5)
+        if party == "s":
+            print("Selecting secret number (private key) for sender...")
+        else:
+            print("Selecting secret number (private key) for recipient...")
+        sleep(2.5)
 
-    # Bob and Alice each select a unique number that is a secret. The numbers shouldn't be the same.
-    secret_number: int = randint(1000, 10000)
+        # sender and recipient each determine a secret number.
+        secret_number: int = randint(1000, 10000)
 
-    print("Using modular function (b**secret_number % m) to generate public key")
-    if party == "s":
-        print("for sender...", end='')
-    else:
-        print("for recipient", end='')
-    print("")
-    sleep(3.5)
+        print("Using modular function (b**secret_number % m) to generate public key")
+        if party == "s":
+            print("for sender...", end='')
+        else:
+            print("for recipient", end='')
+        print("")
+        sleep(3.5)
 
-    # modular function to create numbers that Bob and Alice need to exchange with each other.
-    public_number: int = (b**secret_number) % m
+        # modular function to create numbers that sender and recipient need to exchange with each other for encryption and decryption
+        public_number: int = (b**secret_number) % m
 
-    keys: dict[str, int] = {"b": b, "m": m, "public_number": public_number, "secret_number": secret_number}
+        # Gather all the key parts (pun intended) into a dictionary.
+        keys: dict[str, int] = {"b": b, "m": m, "public_number": public_number, "secret_number": secret_number}
 
-    print("\nKeys for this session:")
-    for k, v in keys.items():
-        print(f"{k}: {v}")
-    sleep(0.8)
+        if party == "s":
+            print("\nKeys for sender:")
+            for k, v in keys.items():
+                print(f"{k}: {v}")
+        else:
+            print("\nKeys for recipient:")
+            for k, v in keys.items():
+                print(f"{k}: {v}")
+        sleep(0.8)
 
-    filename: str = 'sender.json' if party == 's' else 'recipient.json'
+        filename: str = 'sender.json' if party == 's' else 'recipient.json'
+        with open(filename, 'w', encoding="utf-8") as f:
+            json.dump(keys, f)
 
-    with open(filename, 'w', encoding="utf-8") as f:
-        json.dump(keys, f)
-
-    print(f'\nKeys for {filename[:-5]} saved in "{filename}".', sep='')
-
-
+        print(f'\nKeys for {filename[:-5]} saved in "{filename}".', sep='')
+        if party == "s":
+            print("\n============================\n")
 
 
 def get_sender_info() -> dict[str, int]:
