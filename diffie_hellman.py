@@ -29,9 +29,9 @@ T = TypeVar("T")
 VERSION = "0.1"
 
 
-@click.command(help="Step 1: Generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] using AES encryption and sender's private key and recipient's public key.\n\nStep 3: Decrypt [MESSAGE] or [PATH] using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Data in these files are used to generate the shared key that is required to encrypt and decrypt text.")
+@click.command(help="Step 1: Generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] using AES encryption and sender's private key and recipient's public key.\n\nStep 3: Decrypt the encrypted text (in \"encrypted.json\") using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nThe encrypted content is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Data in these files are used to generate the shared key that is required to encrypt and decrypt text.")
 @click.argument("message", type=str, required=False)
-@click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys.')
+@click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys for sender or recipient.')
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
 @click.option("-p", "--printkeys", is_flag=True, default=False, help="Print sender and recipient keys.")
 @click.version_option(version=VERSION)
@@ -187,9 +187,9 @@ def generate_DH() -> None:
     # modular function to create numbers that Bob and Alice need to exchange with each other.
     public_number: int = (b**secret_number) % m
 
-    keys: dict[str, int] = {"b": b, "m": m, "secret_number": secret_number, "public_number": public_number}
+    keys: dict[str, int] = {"b": b, "m": m, "public_number": public_number, "secret_number": secret_number}
 
-    filename: str = 'sender.json' if party =='s' else 'recipient.json'
+    filename: str = 'sender.json' if party == 's' else 'recipient.json'
 
     with open(filename, 'w', encoding="utf-8") as f:
         json.dump(keys, f)
@@ -198,9 +198,17 @@ def generate_DH() -> None:
 
 
 def get_sender_info() -> dict[str, int]:
+    """
+    Retrieve the keys for the sender from the "sender.json" file.
+
+    Returns
+    -------
+    dict[str, int] -- sender's keys
+    """
     with open("sender.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
     return sender_keys
+
 
 def is_prime(n: int) -> bool:
     """
@@ -231,17 +239,27 @@ def print_keys() -> None:
     Print the sender's and recipient's keys.
     """
 
-    with open("sender_key_file.json", 'r', encoding='utf-8') as file:
+    with open("sender.json", 'r', encoding='utf-8') as file:
         sender_keys = json.load(file)
-    with open("recipient_key_file.json", 'r', encoding='utf-8') as file:
+    with open("recipient.json", 'r', encoding='utf-8') as file:
         recipient_keys = json.load(file)
 
+    print('SENDER KEYS:')
     for k, v in sender_keys.items():
         print(f'{k}: {v}')
-    print()
+
+    print('\nRECIPIENT KEYS:', sep='')
 
     for k, v in recipient_keys.items():
         print(f'{k}: {v}')
+
+    """
+    shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
+    """
+
+    print('\n\n==== TROUBLESHOOTING ONLY: SHARED KEYS SHOULD BE THE SAME ====', sep='')
+    print(f"   Shared key - sender: {recipient_keys['public_number'] ** sender_keys['secret_number'] % sender_keys['m']}")
+    print(f"Shared key - recipient: {sender_keys['public_number'] ** recipient_keys['secret_number'] % recipient_keys['m']}")
 
     return
 
