@@ -14,7 +14,6 @@ The "passing" of public keys is done during encryption by reading the public key
 Key exchange with RSA encryption works differently. Keys for the sender and the recipient are generated independently of each other. With Diffie-Hellman, both parties need to agree on and share a "base" and "modulus" but each party selects their own "secret number". With these values, a public key is generated using modular exponentiation [(base**secret_number) % modulus]. Clearly, the public keys for each party will be different, but they are related and this is what allows for encryption/decryption.
 
 With Diffie-Hellman, parties must exchange their public keys. The sender uses their secret number and the recipient's public key to calculate a shared key to encrypt text with. The recipient uses their own secret number and the sender's public key to calculate the same shared key that is used to decrypt the encrypted text.
-
 """
 
 import json
@@ -32,7 +31,7 @@ from icecream import ic
 VERSION = "0.1"
 
 
-@click.command(help="This utility performs two functions:\n\n1. Generate keys to securely transmit encrypted text for decryption\n\n2. Encrypt text using AES encryption\n\nStep 1: Use --generate to generate keys for sender and recipient.\n\nStep 2: Encrypt [MESSAGE] or [PATH] sender's private key, and recipient's public key.\n\nStep 3: Decrypt the encrypted text (in \"encrypted.json\") using recipient's private key and sender's public key.\n\n[MESSAGE] must be a quote-delimited string.\n\nText is encrypted using AES encryption and is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.", epilog="EXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\"\n\nKeys are stored in \"sender.json\" and \"recipient.json\". Sender uses their own secret number and the recipient's public key to encrypt. Recipient uses their own secret key and the sender's public key to decrypt.")
+@click.command(help="This utility performs two functions:\n\n1. Generate keys for both the SENDER and the RECIPIENT\n\n2. Encrypt text using AES encryption using the \"shared key\".\n\nSTEP 1: Use --generate to generate keys for SENDER and RECIPIENT.\n\nSTEP 2: Provide a [MESSAGE] or [PATH] to encrypt using SENDER's private key and RECIPIENt's public key.\n\nSTEP 3: Decrypt the encrypted text using RECIPIENt's private key and SENDER's public key.\n\n[MESSAGE] must be a quote-delimited string.", epilog="\n\nKeys are stored in \"sender.json\" and \"recipient.json\".\n\nText is encrypted using AES encryption and is written to \"encrypted.json\" and the content of that file is decrypted to \"unencrypted.txt\". If either file exists, it will be overwritten.\n\nEXAMPLE USAGE:\n\ndiffie_hellman.py \"The troops roll out at midnight.\" --> encrypts text to \"encrypted.json\"\n\ndiffie_hellman.py --> decrypt \"encrypted.json\" to \"unencrypted.txt\".")
 @click.argument("message", type=str, required=False)
 @click.option("-g", "--generate", is_flag=True, default=False, help='Generate Diffie-Hellman keys for sender and recipient.')
 @click.option("-f", "--file", type=click.Path(exists=False), help='File to encrypt.')
@@ -316,9 +315,17 @@ def print_keys() -> None:
     shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
     """
 
-    print('\n\n==== TROUBLESHOOTING ONLY: SHARED KEYS SHOULD BE THE SAME ====', sep='')
-    print(f"   Shared key - sender: {recipient_keys['public_number'] ** sender_keys['secret_number'] % sender_keys['m']}")
-    print(f"Shared key - recipient: {sender_keys['public_number'] ** recipient_keys['secret_number'] % recipient_keys['m']}")
+    h1: str= f' TROUBLESHOOTING ONLY '
+    h2: str = f'SHARED KEYS SHOULD BE THE SAME'
+    h3: str = f'AND SHOULD NEVER BE TRANSMITTED'
+    print()
+    print(h1.center(43, "="), sep='')
+    print(h2.center(43))
+    print(h3.center(43), "\n", sep="")
+
+    print(f"   Shared key - sender: {recipient_keys['public_number'] ** sender_keys['secret_number'] % sender_keys['modulus']}")
+    print(f"Shared key - recipient: {sender_keys['public_number'] ** recipient_keys['secret_number'] % recipient_keys['modulus']}")
+    print("=".center(43, "="))
 
     return
 
