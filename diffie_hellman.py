@@ -11,6 +11,10 @@ Unlike other encryption programs that I have written, this one includes a mechan
 
 The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. The private key needed for encryption is read from the sender's .json file. From these data, a shared key is created and used for encryption. Decryption requires reading the sender's public key and the recipient's private key. The recipient then creates the same shared key that was used by the sender to encrypt the text.
 
+Key exchange with RSA encryption works differently. Keys for the sender and the recipient are generated independently of each other. With Diffie-Hellman, both parties need to agree on and share a "base" and "modulus" but each party selects their own "secret number". With these values, a public key is generated using modular exponentiation [(base**secret_number) % modulus]. Clearly, the public keys for each party will be different, but they are related and this is what allows for encryption/decryption.
+
+With Diffie-Hellman, parties must exchange their public keys. The sender uses their secret number and the recipient's public key to calculate a shared key to encrypt text with. The recipient uses their own secret number and the sender's public key to calculate the same shared key that is used to decrypt the encrypted text.
+
 """
 
 import json
@@ -70,7 +74,7 @@ def encrypt(message: str) -> None:
     message : str -- message to encrypt
     """
 
-    # To encrypt, keys will have already been generated and stored in sender.json and recipient.json
+    # To encrypt, keys will have already been generated and stored in sender.json and recipient.json. These keys must be share between sender and recipient. (Thus, we open both files to get access to both keys!)
     try:
         with open("sender.json", 'r', encoding='utf-8') as file:
             sender_keys = json.load(file)
@@ -81,10 +85,10 @@ def encrypt(message: str) -> None:
         print("Use --generate option first to create sender\nand recipient keys.")
         exit()
 
-    # Using the recipient's private key and the sender's public key, calculate the "shared_secret" value.
-    shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % sender_keys['m']
+    # The sender is encrypting this text, so the sender needs to have the recipient's public key and their own secret number. Use these values to calculate the "shared_secret" value.
+    shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['modulus']
 
-    # Convert "message" from a str to a byte string.
+    # Convert "message" from a str to a byte string, as required by AES.
     data: bytes = message.encode(encoding='utf-8')
 
     # Generate iterations, key_length, and salt in bytes. This is a very big number!
@@ -92,6 +96,7 @@ def encrypt(message: str) -> None:
     iterations: int = 100_000
     key_length: int = 32
 
+    # Use the shared secret key to generate a key using PBKDF2.
     key: bytes = PBKDF2(shared_key, salt, dkLen=key_length, count=iterations, hmac_hash_module=SHA256)
 
     cipher = AES.new(key, AES.MODE_EAX)
@@ -128,7 +133,7 @@ def decrypt() -> None:
     iterations: int = info['iterations']
     iv: bytes = bytes.fromhex(info['iv'])
 
-    # Retrieve the sender's and recipient's key information.
+    # Since it is the recipient who is decrypting this text, the recipient retrieves the sender's public key and recipient's private key.
     try:
         with open("sender.json", 'r', encoding='utf-8') as file:
             sender_keys = json.load(file)
@@ -139,7 +144,7 @@ def decrypt() -> None:
         print("Use --generate option first to create sender\nand recipient keys.")
         exit()
 
-    shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['m']
+    shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['modulus']
 
     # Derive the key using the provided salt and iterations
     key: bytes = PBKDF2(shared_key, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
@@ -155,20 +160,20 @@ def decrypt() -> None:
 
 def generate_DH() -> None:
     """
-    b^secret_number mod m. This formula is public. b and m are known to both parties. m must be a prime number.
+    "base"^"secret_number" mod "modulus". This formula is public. "base" and "modulus" are known to both parties. "modulus" must be a prime number.
 
     "secret_number" is known only to the parties and each party has a different "secret_number". In this function, a "secret_number" is selected randomly and assigned to each party. That number is used by each party to calculate a "public_number". Each party shares their "public_number" with the other party.
 
     Each party can calculate a "shared_key" by using THEIR "secret_number" and the OTHER party's "public_number".
 
-    "b", "m", "secret_number", "public_number", are all values required to calculate a "shared_key". Both the sender and the recipient, with the correct information from the other party, will calculate the same shared key. Because this calculation depends on the "secret_number" that only one party knows, only the sender and recipient can calculate this shared number. That is the magic of Duffie-Hellman key exchange.
+    "base", "modulus", "secret_number", "public_number", are all values required to calculate a "shared_key". Both the sender and the recipient, with the correct information from the other party, will calculate the same shared key. Because this calculation depends on the "secret_number" that only one party knows, only the sender and recipient can calculate this shared number. That is the magic of Duffie-Hellman key exchange.
 
     CODENOTE
     Because adhering to the following guidelines results in very long computation times, I have chosen to deviate. But these guidelines are recommended selecting secure values for "b", "m", and the "secret number".
-    "b":
+    "base":
         The base, it's often chosen to be a small prime number or a primitive root modulo "m". While "b" doesn't need to be as large as "m", it should be chosen to ensure the security properties of the Diffie-Hellman exchange are maintained. In many cases, "b" is simply set to 2 or another small number.
 
-    "m":
+    "modulus":
         You need to generate a large prime number that is at least 2048 bits long for adequate security. This is not something you can do with a simple random byte generator, as the number must be prime, not just random. There are specialized algorithms and libraries designed to generate large prime numbers for cryptographic purposes. For example, OpenSSL provides functionality to generate such prime numbers1.
 
     "secret_number":
@@ -182,23 +187,22 @@ def generate_DH() -> None:
         party: str = "s" if round == 0 else "r"
 
         if party == 's':
-            print("Generating common base (b) and modulus (m)...")
+            print('Generating common "base" and "modulus"...')
         else:
-            print("Retrieving common base (b) and modulus (m) from sender...")
+            print('Retrieving common "base" and "modulus" from sender...')
         sleep(2.5)
 
         # sender chooses a "b" and an "m". recipient uses the same values, which have been stored in "sender.json".
         if party == "s":
-            b: int = 3
+            base: int = 3
             while True:
-                m: int = randint(10, 256)
-                # m: int = randint(10, 256)
-                if is_prime(m):
+                modulus: int = randint(10, 256)
+                if is_prime(modulus):
                     break
         else:
             sender_keys: dict[str, int] = get_sender_info()
-            b: int = sender_keys['b']
-            m: int = sender_keys['m']
+            base: int = sender_keys['base']
+            modulus: int = sender_keys['modulus']
 
         if party == "s":
             print("Selecting secret number (private key) for sender...")
@@ -218,10 +222,10 @@ def generate_DH() -> None:
         sleep(3.5)
 
         # modular function to create numbers that sender and recipient need to exchange with each other for encryption and decryption
-        public_number: int = (b**secret_number) % m
+        public_number: int = (base**secret_number) % modulus
 
         # Gather all the key parts (pun intended) into a dictionary.
-        keys: dict[str, int] = {"b": b, "m": m, "public_number": public_number, "secret_number": secret_number}
+        keys: dict[str, int] = {"base": base, "modulus": modulus, "public_number": public_number, "secret_number": secret_number}
 
         if party == "s":
             print("\nKeys for sender:")
