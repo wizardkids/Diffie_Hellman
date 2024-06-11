@@ -81,8 +81,8 @@ def encrypt(message: str) -> None:
         print("Use --generate option first to create sender\nand recipient keys.")
         exit()
 
-    # Using the recipient's publick key and the sender's private key, calculate the "shared_secret" value.
-    shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
+    # Using the recipient's private key and the sender's public key, calculate the "shared_secret" value.
+    shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % sender_keys['m']
 
     # Convert "message" from a str to a byte string.
     data: bytes = message.encode(encoding='utf-8')
