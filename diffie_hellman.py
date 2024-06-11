@@ -10,6 +10,7 @@
 Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for both the sender or the recipient. Both parties can then calculate the key to encrypt/decrypt text.
 
 The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. The private key needed for encryption is read from the sender's .json file. From these data, a shared key is created and used for encryption. Decryption requires reading the sender's public key and the recipient's private key. The recipient then creates the same shared key that was used by the sender to encrypt the text.
+
 """
 
 import json
