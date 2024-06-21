@@ -9,7 +9,7 @@
 
 Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for both the sender or the recipient. Both parties can then calculate the key to encrypt/decrypt text.
 
-The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. The private key needed for encryption is read from the sender's .json file. From these data, a shared key is created and used for encryption. Decryption requires reading the sender's public key and the recipient's private key. The recipient then creates the same shared key that was used by the sender to encrypt the text.
+The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. Encryption uses the sender's private key and the recipient's public key. From these data, a shared key is created and used for encryption. Decryption uses the sender's public key and the recipient's private key. The recipient then creates the same shared key to decrypt the message that was used by the sender to encrypt the text.
 
 Key exchange with RSA encryption works differently. Keys for the sender and the recipient are generated independently of each other. With Diffie-Hellman, both parties need to agree on and share a "base" and "modulus" but each party selects their own "secret number". With these values, a public key is generated using modular exponentiation [(base**secret_number) % modulus]. Clearly, the public keys for each party will be different, but they are related and this is what allows for encryption/decryption.
 
