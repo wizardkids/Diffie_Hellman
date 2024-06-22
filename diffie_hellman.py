@@ -4,14 +4,14 @@
       Author: Richard E. Rawson
         Date: 2024-06-05
  Description: This program includes two major functions:
-     (i) DH key exchange
-    (ii) AES encryption
+                 (i) DH key exchange
+                (ii) AES encryption
 
-Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for both the sender or the recipient. Both parties can then calculate the key to encrypt/decrypt text.
+Unlike other encryption programs that I have written, this one includes a mechanism for secure transmission of the key required for decryption. The generate_DH() function generates keys for the sender or the recipient, separately. Both parties can then calculate the key to encrypt/decrypt text.
 
-The "passing" of public keys is done during encryption by reading the public key in the recipient's .json file. Encryption uses the sender's private key and the recipient's public key. From these data, a shared key is created and used for encryption. Decryption uses the sender's public key and the recipient's private key. The recipient then creates the same shared key to decrypt the message that was used by the sender to encrypt the text.
+Encryption uses the sender's private key and the recipient's public key. From these data, a shared key is created and used for encryption. Decryption uses the sender's public key and the recipient's private key. The recipient then creates the same shared key to decrypt the message that was used by the sender to encrypt the text.
 
-Key exchange with RSA encryption works differently. Keys for the sender and the recipient are generated independently of each other. With Diffie-Hellman, both parties need to agree on and share a "base" and "modulus" but each party selects their own "secret number". With these values, a public key is generated using modular exponentiation [(base**secret_number) % modulus]. Clearly, the public keys for each party will be different, but they are related and this is what allows for encryption/decryption.
+Key exchange with RSA encryption works differently. Keys for the sender and the recipient are generated independently of each other. With Diffie-Hellman, in contrast, both parties need to agree on and share a "base" and "modulus" but each party selects their own "secret number". With these values, a public key is generated using modular exponentiation [(base**secret_number) % modulus]. Clearly, the public keys for each party will be different, but they are related and this is what allows for encryption/decryption.
 
 With Diffie-Hellman, parties must exchange their public keys. The sender uses their secret number and the recipient's public key to calculate a shared key to encrypt text with. The recipient uses their own secret number and the sender's public key to calculate the same shared key that is used to decrypt the encrypted text.
 """
@@ -26,7 +26,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
-from icecream import ic
+# from icecream import ic
 
 VERSION = "0.1"
 
@@ -127,12 +127,13 @@ def decrypt() -> None:
         print("Provide text to encrypt first.")
         exit()
 
+    # Convert ciphertext, salt, and iv (from encrypted.json) to bytes.
     ciphertext: bytes = bytes.fromhex(info['ciphertext'])
     salt: bytes = bytes.fromhex(info['salt'])
     iterations: int = info['iterations']
     iv: bytes = bytes.fromhex(info['iv'])
 
-    # Since it is the recipient who is decrypting this text, the recipient retrieves the sender's public key and recipient's private key.
+    # Since it is the recipient who is decrypting this text, the recipient retrieves the sender's public key and uses recipient's private key.
     try:
         with open("sender.json", 'r', encoding='utf-8') as file:
             sender_keys = json.load(file)
@@ -143,6 +144,7 @@ def decrypt() -> None:
         print("Use --generate option first to create sender\nand recipient keys.")
         exit()
 
+    # Compute the same shared key that was used to encrypt the plaintext.
     shared_key: int = (sender_keys['public_number']**recipient_keys['secret_number']) % recipient_keys['modulus']
 
     # Derive the key using the provided salt and iterations
