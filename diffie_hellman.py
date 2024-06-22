@@ -26,6 +26,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
+
 # from icecream import ic
 
 VERSION = "0.1"
@@ -113,6 +114,7 @@ def encrypt(message: str) -> None:
     with open('encrypted.json', 'w', encoding='utf-8') as f:
         json.dump(encrypted_bundle, f)
 
+
 def decrypt() -> None:
     """
     Decrypt the encrypted message saved in "encrypted.json". Decryption requires the public key from the sender and the recipient's private key (secret number).
@@ -184,8 +186,8 @@ def generate_DH() -> None:
     """
 
     # Go two rounds of key construction, where the first round is for the sender and the second round is for the recipient. Since the recipient and sender need the same "b" and "m", the recipient gets those values from the sender.
-    for round in range(2):
-        party: str = "s" if round == 0 else "r"
+    for rnd in range(2):
+        party: str = "s" if rnd == 0 else "r"
 
         if party == 's':
             print('Generating common "base" and "modulus"...')
@@ -317,9 +319,9 @@ def print_keys() -> None:
     shared_key: int = (recipient_keys['public_number']**sender_keys['secret_number']) % sender_keys['m']
     """
 
-    h1: str= f' TROUBLESHOOTING ONLY '
-    h2: str = f'SHARED KEYS SHOULD BE THE SAME'
-    h3: str = f'AND SHOULD NEVER BE TRANSMITTED'
+    h1: str = ' TROUBLESHOOTING ONLY '
+    h2: str = 'SHARED KEYS SHOULD BE THE SAME'
+    h3: str = 'AND SHOULD NEVER BE TRANSMITTED'
     print()
     print(h1.center(43, "="), sep='')
     print(h2.center(43))
